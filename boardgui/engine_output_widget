@@ -1,0 +1,9 @@
+from PyQt5.QtWidgets import QTextEdit
+
+class EngineOutputWidget(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setReadOnly(True)
+
+    def update_output(self,output):
+        self.append(output)
