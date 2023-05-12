@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QDialogButtonBox, QColorDialog, QGridLayout
 from PyQt5.QtGui import QColor, QTransform
+from board.chessboard import ChessBoard
 
 class SquareColorDialog(QDialog):
     def __init__(self, chess_board, parent=None):
@@ -15,7 +16,9 @@ class SquareColorDialog(QDialog):
         for i in range(8):
             for j in range(8):
                 button = QPushButton()
-                button.setStyleSheet(f"background-color: {self.chess_board.default_board_colors[(i + j) % 2].name()}")
+                key = 'A' if (i + j) % 2 == 0 else 'B'
+                color = self.chess_board.get_square_color(i, j)
+                button.setStyleSheet(f"background-color: {color.name()}")
                 button.clicked.connect(lambda _, x=i, y=j: self.change_square_color(x, y))
                 layout.addWidget(button, j, i)
 
@@ -25,9 +28,10 @@ class SquareColorDialog(QDialog):
 
         self.setLayout(layout)
 
-    # Update change_square_color method in SquareColorDialog class
     def change_square_color(self, x, y):
-        color_dialog = QColorDialog(self.chess_board.default_board_colors[(x + y) % 2], self)
+        key = 'A' if (x + y) % 2 == 0 else 'B'
+        color = self.chess_board.get_square_color(x, y)
+        color_dialog = QColorDialog(color, self)
         ok = color_dialog.exec_()
         if ok:
             color = color_dialog.currentColor()

@@ -1,6 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication
-from boardgui.mainwindow import MainWindow
+from settings.mainwindow import MainWindow
+from board.chessboardview import ChessBoardView
 
 def main():
     app = QApplication(sys.argv)

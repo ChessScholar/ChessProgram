@@ -1,1 +1,6 @@
-{"board_colors": ["#f0d9b5", "#b58863"]}
+{
+  "board_colors": {
+    "A": "#F0D9B5",
+    "B": "#B58863"
+  }
+}
