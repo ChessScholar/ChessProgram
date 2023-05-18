@@ -16,9 +16,14 @@ class ChessEngine:
     def set_engine_options(self, options):
         self.engine.configure(options)
 
-    def analyze(self, board, depth=None, lines=None, cores=None):
+    def analyze(self, board, depth=None, lines=None, cores=None, memory=None):
         limit = chess.engine.Limit(depth=depth)
-        info = self.engine.analyse(board, limit, multipv=lines, threads=cores, info=chess.engine.INFO_ALL, output_callback=self.output_callback)
+        options = {
+            "Threads": cores,
+            "Hash": memory
+        }
+        self.engine.configure(options)
+        info = self.engine.analyse(board, limit, multipv=lines, info=chess.engine.INFO_ALL)
         return info
 
     def close(self):

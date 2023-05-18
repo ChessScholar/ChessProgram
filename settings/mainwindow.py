@@ -11,13 +11,15 @@ from settings.squarecolors import SquareColorDialog
 from Engine.engine import ChessEngine
 from board.mouse import MouseHandler
 from config import CONFIG
-
+from Engine.enginemanager import EngineManager
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.init_ui()
         self.analysis_timer = None
+        self.engine_manager = EngineManager(self)
+        self.mouse_handler = MouseHandler(self.centralWidget().scene())
 
     def init_ui(self):
         """Initialize the main UI components."""
@@ -25,7 +27,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(ChessBoardView())
         self.create_menus()
         self.load_settings()
-        self.create_engine_settings()
         self.engine = None
         self.mouse_handler = MouseHandler(self.centralWidget().scene())
 
@@ -64,8 +65,20 @@ class MainWindow(QMainWindow):
 
     def save_settings(self):
         """Save the current settings to a JSON file."""
+        chess_board = self.centralWidget().scene()
+        board_colors = {
+            'A': chess_board.default_board_colors['A'].name(),
+            'B': chess_board.default_board_colors['B'].name(),
+            'individual': {}
+        }
+        for i in range(8):
+            for j in range(8):
+                key = f"{i}-{j}"
+                color = chess_board.get_square_color(i, j)
+                board_colors['individual'][key] = color.name()
+
         settings = {
-            'board_colors': [color.name() for color in self.centralWidget().scene().default_board_colors]
+            'board_colors': board_colors
         }
         with open('settings.json', 'w') as settings_file:
             json.dump(settings, settings_file)
@@ -75,17 +88,19 @@ class MainWindow(QMainWindow):
         if os.path.exists('settings.json'):
             with open('settings.json', 'r') as settings_file:
                 settings = json.load(settings_file)
-                board_colors = {key: QColor(color) for key, color in settings['board_colors'].items()}
                 chess_board = self.centralWidget().scene()
-                chess_board.default_board_colors = board_colors
-                chess_board.clear()
-                chess_board.init_ui()
-        if 'board_colors' in settings:
-                board_colors = {key: QColor(color) for key, color in settings['board_colors'].items()}
-                chess_board = self.centralWidget().scene()
-                chess_board.default_board_colors = board_colors
-                chess_board.clear()
-                chess_board.init_ui()
+                if 'A' in settings['board_colors']:
+                    chess_board.default_board_colors['A'] = QColor(settings['board_colors']['A'])
+                if 'B' in settings['board_colors']:
+                    chess_board.default_board_colors['B'] = QColor(settings['board_colors']['B'])
+                if 'individual' in settings['board_colors']:
+                    for i in range(8):
+                        for j in range(8):
+                            key = f"{i}-{j}"
+                            if key in settings['board_colors']['individual']:
+                                color = QColor(settings['board_colors']['individual'][key])
+                                chess_board.set_square_color(i, j, color)
+
 
     def open_board_colors_dialog(self):
         """Open the board colors dialog."""
@@ -148,118 +163,3 @@ class MainWindow(QMainWindow):
         """Open the dialog to set individual board colors."""
         square_color_dialog = SquareColorDialog(chess_board, self)
         square_color_dialog.exec_()
-
-####################  ENGINE  ##########################
-
-    def create_engine_settings(self):
-        engine_settings = QDockWidget("Engine Settings", self)
-        engine_settings.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-
-        engine_group = QGroupBox("Engine")
-        engine_layout = QVBoxLayout()
-
-        self.start_engine_button = QPushButton("Start Engine")
-        self.start_engine_button.clicked.connect(self.start_engine)
-        engine_layout.addWidget(self.start_engine_button)
-
-        self.stop_engine_button = QPushButton("Stop Engine")
-        self.stop_engine_button.clicked.connect(self.stop_engine)
-        engine_layout.addWidget(self.stop_engine_button)
-
-        engine_group.setLayout(engine_layout)
-
-        options_group = QGroupBox("Options")
-        options_layout = QFormLayout()
-
-        self.depth_spinbox = QSpinBox()
-        self.depth_spinbox.setRange(1, 100)
-        self.depth_spinbox.setValue(10)
-        options_layout.addRow("Depth:", self.depth_spinbox)
-
-        self.lines_spinbox = QSpinBox()
-        self.lines_spinbox.setRange(1, 100)
-        self.lines_spinbox.setValue(1)
-        options_layout.addRow("Lines:", self.lines_spinbox)
-
-        self.cores_spinbox = QSpinBox()
-        self.cores_spinbox.setRange(1, 100)
-        self.cores_spinbox.setValue(1)
-        options_layout.addRow("Cores:", self.cores_spinbox)
-
-        self.nnue_checkbox = QCheckBox("Use NNUE")
-        options_layout.addRow(self.nnue_checkbox)
-
-        options_group.setLayout(options_layout)
-
-        layout = QVBoxLayout()
-        layout.addWidget(engine_group)
-        layout.addWidget(options_group)
-
-        container = QWidget()
-        container.setLayout(layout)
-        engine_settings.setWidget(container)
-
-        self.addDockWidget(Qt.RightDockWidgetArea, engine_settings)
-
-        self.engine_output = QTextEdit()
-        self.engine_output.setReadOnly(True)
-        layout.addWidget(self.engine_output)
-    
-    def start_engine(self):
-        engine_path = CONFIG['engine_path']
-        nnue_path = CONFIG['nnue_path']
-
-        try:
-            self.engine = ChessEngine(engine_path, nnue_path)
-            self.update_engine_analysis()
-
-            # Create a QTimer and connect it to the update_engine_analysis method
-            self.analysis_timer = QTimer(self)
-            self.analysis_timer.timeout.connect(self.update_engine_analysis)
-            self.analysis_timer.start(1000)  # Update every 1000 milliseconds (1 second)
-
-        except FileNotFoundError:
-            QMessageBox.warning(self, "Error", "Engine not found. Please check the engine path in the config file.")
-
-    def update_engine_analysis(self):
-        if self.engine:
-            board = self.centralWidget().scene().board
-            depth = self.depth_spinbox.value()
-            lines = self.lines_spinbox.value()
-            cores = self.cores_spinbox.value()
-            use_nnue = self.nnue_checkbox.isChecked()
-
-            options = {
-                "Threads": cores,
-                "Use NNUE": use_nnue
-            }
-            if self.engine.nnue_path and use_nnue:  # Access nnue_path from the engine instance
-                options["EvalFile"] = self.engine.nnue_path
-
-            self.engine.set_engine_options(options)
-            limit = chess.engine.Limit(depth=depth)
-            analysis_info = self.engine.engine.analyse(board, limit, multipv=lines, info=chess.engine.INFO_ALL)
-            self.engine_output.clear()
-            move_pairs = []
-            for i, info in enumerate(analysis_info):
-                move_san = board.san(info['pv'][0])
-                if i % 2 == 0:
-                    move_pairs.append(f"{(i // 2) + 1}. {move_san}")
-                else:
-                    move_pairs[-1] += f" {move_san}"
-            self.engine_output.append(" ".join(move_pairs))
-            print(analysis_info)
-
-    def engine_output_callback(self, output):
-        print(output)
-
-    def stop_engine(self):
-        print("Updating engine analysis...")
-        if self.engine:
-            self.engine.close()
-            self.engine = None
-
-            # Stop the QTimer
-            if self.analysis_timer:
-                self.analysis_timer.stop()
-                self.analysis_timer = None

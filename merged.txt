@@ -1,0 +1,581 @@
+C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\requirements.txt 
+PyQt5==5.15.4
+python-chess==1.6.1C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\config.py 
+import os
+import glob
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+engine_dir = os.path.join(parent_dir, 'ChessProgram', 'Engine')  # Add the missing folder 'ChessProgram'
+
+stockfish_files = glob.glob(os.path.join(engine_dir, '*stockfish*.exe'))
+nnue_files = glob.glob(os.path.join(engine_dir, '*.nnue'))
+
+engine_path = stockfish_files[0] if stockfish_files else None
+nnue_path = nnue_files[0] if nnue_files else None
+
+print(f"Engine directory: {engine_dir}")
+print(f"Stockfish files: {stockfish_files}")
+print(f"NNUE files: {nnue_files}")
+print(f"Engine path: {engine_path}")
+print(f"NNUE path: {nnue_path}")
+
+CONFIG = {
+    'engine_path': engine_path,
+    'nnue_path': nnue_path,
+    'settings_file': 'settings.json'
+}
+
+
+C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\main.py 
+import sys
+from PyQt5.QtWidgets import QApplication
+from settings.mainwindow import MainWindow
+from board.chessboardview import ChessBoardView
+
+def main():
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    exit_code = app.exec_()
+    main_window.save_settings()
+    sys.exit(exit_code)
+
+if __name__ == "__main__":
+    main()C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\__init__.py 
+# Empty fileC:\Users\Matt PC\Desktop\ChessProject\ChessProgram\board\chessboard.py 
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5 import QtGui
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QGraphicsScene, QGraphicsPixmapItem
+from PyQt5.QtGui import QColor, QBrush, QTransform
+import chess
+from board.chesssquare import ChessSquare
+
+class ChessBoard(QGraphicsScene):
+    squareClicked = pyqtSignal(chess.Square, chess.Piece, int, int)
+    def __init__(self):
+        super().__init__()
+        self.default_board_colors = {'A': QColor(240, 217, 181), 'B': QColor(181, 136, 99)}
+        self.board = chess.Board()
+        self.init_ui()
+        self.selected_square = None
+
+    def init_ui(self):
+        for i in range(8):
+            for j in range(8):
+                key = 'A' if (i + j) % 2 == 0 else 'B'
+                color = self.default_board_colors[key]
+                square = ChessSquare(i, j, color)
+                self.addItem(square)
+        self.place_pieces()
+
+    def set_square_color(self, x, y, color):
+        key = 'A' if (x + y) % 2 == 0 else 'B'
+        square = self.itemAt(x * 100, y * 100, QTransform())
+        if square:
+            square.set_color(color)
+            self.default_board_colors[key] = color
+
+    def board_colors(self):
+        chess_board = self.scene()
+        chess_board.clear()
+        chess_board.init_ui()
+        return self.default_board_colors
+
+    def get_board_color(self, index):
+        key = 'A' if index == 0 else 'B'
+        return self.default_board_colors[key]
+
+    def get_square_color(self, x, y):
+        key = 'A' if (x + y) % 2 == 0 else 'B'
+        square = self.itemAt(x * 100, y * 100, QTransform())
+        if square:
+            return square.color
+        return self.default_board_colors[key]
+
+    def set_board_color(self, index, color):
+        key = 'A' if index == 0 else 'B'
+        self.default_board_colors[key] = color
+        self.clear()
+        self.init_ui()
+        
+    def place_pieces(self):
+        for square in chess.SQUARES:
+            piece = self.board.piece_at(square)
+            if piece:
+                x, y = chess.square_file(square), chess.square_rank(square)
+                piece_item = QGraphicsPixmapItem(self.get_piece_image(piece))
+                piece_item.setPos(x * 100, y * 100)
+                piece_item.setAcceptedMouseButtons(Qt.NoButton)  # Add this line
+                self.addItem(piece_item)
+    def get_piece_image(self, piece):
+        piece_name = piece.symbol().lower()
+        piece_color = "w" if piece.color == chess.WHITE else "b"
+        file_name = f"img/chesspieces/{piece_color}{piece_name.upper()}.png"
+        return QtGui.QPixmap(file_name)C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\board\chessboardview.py 
+from PyQt5.QtWidgets import QGraphicsView
+from PyQt5.QtGui import QPainter
+from PyQt5.QtCore import Qt
+from board.chessboard import ChessBoard
+
+class ChessBoardView(QGraphicsView):
+    def __init__(self):
+        super().__init__()
+        self.setScene(ChessBoard())
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setOptimizationFlag(QGraphicsView.DontAdjustForAntialiasing, True)
+        self.setOptimizationFlag(QGraphicsView.DontSavePainterState, True)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+
+    def resizeEvent(self, event):
+        size = min(self.width(), self.height())
+        self.setFixedSize(size, size)
+        self.fitInView(self.sceneRect(), Qt.KeepAspectRatio)C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\board\chesssquare.py 
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QGraphicsRectItem
+from PyQt5.QtGui import QBrush, QTransform, QColorTransform
+import chess
+
+class ChessSquare(QGraphicsRectItem):
+    def __init__(self, x, y, color):
+        super().__init__(x * 100, y * 100, 100, 100)
+        self.color = color
+        self.setBrush(QBrush(color))
+
+    def set_color(self, color):
+        self.color = color
+        self.setBrush(QBrush(color))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            x, y = int(self.x() // 100), int(self.y() // 100)
+            square = chess.square(x, y)
+            piece = self.scene().board.piece_at(square)
+            self.scene().squareClicked.emit(square, piece, x, y)C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\board\mouse.py 
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QGraphicsItem
+from PyQt5.QtGui import QTransform
+import chess
+
+class MouseHandler:
+    def __init__(self, chess_board):
+        self.chess_board = chess_board
+        self.chess_board.squareClicked.connect(self.on_square_clicked)
+        self.selected_piece = None
+
+    def on_square_clicked(self, square, piece, x, y):
+        if self.selected_piece:
+            self.move_piece(square, piece, x, y)
+        else:
+            self.select_piece(square, piece, x, y)
+
+    def select_piece(self, square, piece, x, y):
+        if piece:
+            self.selected_piece = self.chess_board.itemAt(x * 100, y * 100, QTransform())  # Update this line
+            self.selected_piece.setFlag(QGraphicsItem.ItemIsMovable, True)
+
+    def move_piece(self, target_square, target_piece, x, y):
+        source_square = chess.square(self.selected_piece.x() // 100, self.selected_piece.y() // 100)
+        move = chess.Move(source_square, target_square)
+        san_move = self.chess_board.board.san(move)
+
+        try:
+            self.chess_board.board.push_san(san_move)
+            self.selected_piece.setPos(x * 100, y * 100)
+            self.selected_piece.setFlag(QGraphicsItem.ItemIsMovable, False)
+            self.selected_piece = None
+            self.chess_board.clear()
+            self.chess_board.init_ui()
+        except ValueError:
+            self.selected_piece.setFlag(QGraphicsItem.ItemIsMovable, False)
+            self.selected_piece = NoneC:\Users\Matt PC\Desktop\ChessProject\ChessProgram\Engine\engine.py 
+import chess.engine
+import chess.pgn
+
+class ChessEngine:
+    def __init__(self, engine_path, nnue_path=None, output_callback=None):
+        self.engine_path = engine_path
+        self.nnue_path = nnue_path
+        self.output_callback = output_callback
+        self.engine = chess.engine.SimpleEngine.popen_uci(self.engine_path)
+
+        if self.nnue_path:
+            self.engine.configure({"Use NNUE": True, "EvalFile": self.nnue_path})
+        else:
+            self.engine.configure({"Use NNUE": False})
+
+    def set_engine_options(self, options):
+        self.engine.configure(options)
+
+    def analyze(self, board, depth=None, lines=None, cores=None):
+        limit = chess.engine.Limit(depth=depth)
+        info = self.engine.analyse(board, limit, multipv=lines, threads=cores, info=chess.engine.INFO_ALL, output_callback=self.output_callback)
+        return info
+
+    def close(self):
+        self.engine.quit()C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\Engine\enginemanager.py 
+from PyQt5.QtWidgets import (QDockWidget, QLabel, QVBoxLayout, QWidget,
+                             QMessageBox, QPushButton, QColorDialog, QSpinBox, QDialog, QDialogButtonBox,
+                             QGroupBox, QFormLayout, QCheckBox, QTextEdit)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor
+import chess.engine
+import os
+import json
+from config import CONFIG
+from .engine import ChessEngine
+
+class EngineManager:
+    def __init__(self, main_window):
+        self.main_window = main_window
+        self.analysis_timer = None
+        self.engine = None
+        self.create_engine_settings()   
+    
+    def create_engine_settings(self):
+        engine_settings = QDockWidget("Engine Settings", self.main_window)
+        engine_settings.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        engine_group = QGroupBox("Engine")
+        engine_layout = QVBoxLayout()
+
+        self.start_engine_button = QPushButton("Start Engine")
+        self.start_engine_button.clicked.connect(self.start_engine)
+        engine_layout.addWidget(self.start_engine_button)
+
+        self.stop_engine_button = QPushButton("Stop Engine")
+        self.stop_engine_button.clicked.connect(self.stop_engine)
+        engine_layout.addWidget(self.stop_engine_button)
+
+        engine_group.setLayout(engine_layout)
+
+        options_group = QGroupBox("Options")
+        options_layout = QFormLayout()
+
+        self.depth_spinbox = QSpinBox()
+        self.depth_spinbox.setRange(1, 100)
+        self.depth_spinbox.setValue(10)
+        options_layout.addRow("Depth:", self.depth_spinbox)
+
+        self.lines_spinbox = QSpinBox()
+        self.lines_spinbox.setRange(1, 100)
+        self.lines_spinbox.setValue(1)
+        options_layout.addRow("Lines:", self.lines_spinbox)
+
+        self.cores_spinbox = QSpinBox()
+        self.cores_spinbox.setRange(1, 100)
+        self.cores_spinbox.setValue(1)
+        options_layout.addRow("Cores:", self.cores_spinbox)
+
+        self.nnue_checkbox = QCheckBox("Use NNUE")
+        options_layout.addRow(self.nnue_checkbox)
+
+        options_group.setLayout(options_layout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(engine_group)
+        layout.addWidget(options_group)
+
+        container = QWidget()
+        container.setLayout(layout)
+        engine_settings.setWidget(container)
+
+        self.main_window.addDockWidget(Qt.RightDockWidgetArea, engine_settings)
+
+
+        self.engine_output = QTextEdit()
+        self.engine_output.setReadOnly(True)
+        layout.addWidget(self.engine_output)
+    
+    def start_engine(self):
+        engine_path = CONFIG['engine_path']
+        nnue_path = CONFIG['nnue_path']
+
+        try:
+            self.engine = ChessEngine(engine_path, nnue_path)
+            self.update_engine_analysis()
+
+            # Create a QTimer and connect it to the update_engine_analysis method
+            self.analysis_timer = QTimer()
+            self.analysis_timer.timeout.connect(self.update_engine_analysis)
+            self.analysis_timer.start(1000)  # Update every 1000 milliseconds (1 second)
+
+        except FileNotFoundError:
+            QMessageBox.warning(self, "Error", "Engine not found. Please check the engine path in the config file.")
+
+    def update_engine_analysis(self):
+        if self.engine:
+            board = self.main_window.centralWidget().scene().board
+            depth = self.depth_spinbox.value()
+            lines = self.lines_spinbox.value()
+            cores = self.cores_spinbox.value()
+            use_nnue = self.nnue_checkbox.isChecked()
+
+            options = {
+                "Threads": cores,
+                "Use NNUE": use_nnue
+            }
+            if self.engine.nnue_path and use_nnue:  # Access nnue_path from the engine instance
+                options["EvalFile"] = self.engine.nnue_path
+
+            self.engine.set_engine_options(options)
+            limit = chess.engine.Limit(depth=depth)
+            analysis_info = self.engine.engine.analyse(board, limit, multipv=lines, info=chess.engine.INFO_ALL)
+            self.engine_output.clear()
+            move_pairs = []
+            for i, info in enumerate(analysis_info):
+                move_san = board.san(info['pv'][0])
+                if i % 2 == 0:
+                    move_pairs.append(f"{(i // 2) + 1}. {move_san}")
+                else:
+                    move_pairs[-1] += f" {move_san}"
+            self.engine_output.append(" ".join(move_pairs))
+            print(analysis_info)
+
+    def engine_output_callback(self, output):
+        print(output)
+
+    def stop_engine(self):
+        print("Updating engine analysis...")
+        if self.engine:
+            self.engine.close()
+            self.engine = None
+
+            # Stop the QTimer
+            if self.analysis_timer:
+                self.analysis_timer.stop()
+                self.analysis_timer = NoneC:\Users\Matt PC\Desktop\ChessProject\ChessProgram\settings\mainwindow.py 
+from PyQt5.QtWidgets import (QMainWindow, QAction, QDockWidget, QLabel, QVBoxLayout, QWidget,
+                             QMessageBox, QPushButton, QColorDialog, QSpinBox, QDialog, QDialogButtonBox,
+                             QGroupBox, QFormLayout, QCheckBox, QTextEdit)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QColor
+import chess.engine
+import os
+import json
+from board.chessboardview import ChessBoardView
+from settings.squarecolors import SquareColorDialog
+from Engine.engine import ChessEngine
+from board.mouse import MouseHandler
+from config import CONFIG
+from Engine.enginemanager import EngineManager
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+        self.analysis_timer = None
+        self.engine_manager = EngineManager(self) 
+
+    def init_ui(self):
+        """Initialize the main UI components."""
+        self.setWindowTitle("Chess Board GUI")
+        self.setCentralWidget(ChessBoardView())
+        self.create_menus()
+        self.load_settings()
+        self.engine = None
+        self.mouse_handler = MouseHandler(self.centralWidget().scene())
+
+    def create_menus(self):
+        """Create the main menu bar items."""
+        menubar = self.menuBar()
+        file_menu = menubar.addMenu("File")
+        board_menu = menubar.addMenu("Board")
+        analysis_menu = menubar.addMenu("Analysis")
+        view_menu = menubar.addMenu("View")
+
+        board_colors_action = QAction("Board Colors", self)
+        board_colors_action.triggered.connect(self.open_board_colors_dialog)
+        board_menu.addAction(board_colors_action)
+
+####################  GRAPHICS  ##########################
+
+    def prompt_save_changes(self, apply_changes, discard_changes):
+        """Prompt the user to save or discard changes."""
+        message_box = QMessageBox(self)
+        message_box.setWindowTitle("Save Changes")
+        message_box.setText("Save changes before exiting?")
+        message_box.setStandardButtons(QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel)
+        message_box.setDefaultButton(QMessageBox.Save)
+
+        result = message_box.exec_()
+
+        if result == QMessageBox.Save:
+            apply_changes()
+        elif result == QMessageBox.Discard:
+            discard_changes()
+        else:
+            return False
+
+        return True
+
+    def save_settings(self):
+        """Save the current settings to a JSON file."""
+        chess_board = self.centralWidget().scene()
+        board_colors = {
+            'A': chess_board.default_board_colors['A'].name(),
+            'B': chess_board.default_board_colors['B'].name(),
+            'individual': {}
+        }
+        for i in range(8):
+            for j in range(8):
+                key = f"{i}-{j}"
+                color = chess_board.get_square_color(i, j)
+                board_colors['individual'][key] = color.name()
+
+        settings = {
+            'board_colors': board_colors
+        }
+        with open('settings.json', 'w') as settings_file:
+            json.dump(settings, settings_file)
+
+    def load_settings(self):
+        """Load settings from a JSON file, if it exists."""
+        if os.path.exists('settings.json'):
+            with open('settings.json', 'r') as settings_file:
+                settings = json.load(settings_file)
+                chess_board = self.centralWidget().scene()
+                if 'A' in settings['board_colors']:
+                    chess_board.default_board_colors['A'] = QColor(settings['board_colors']['A'])
+                if 'B' in settings['board_colors']:
+                    chess_board.default_board_colors['B'] = QColor(settings['board_colors']['B'])
+                if 'individual' in settings['board_colors']:
+                    for i in range(8):
+                        for j in range(8):
+                            key = f"{i}-{j}"
+                            if key in settings['board_colors']['individual']:
+                                color = QColor(settings['board_colors']['individual'][key])
+                                chess_board.set_square_color(i, j, color)
+
+
+    def open_board_colors_dialog(self):
+        """Open the board colors dialog."""
+        chess_board = self.centralWidget().scene()
+        original_board_colors = chess_board.default_board_colors.copy()
+
+        color_dialog = QDialog(self)
+        color_dialog.setWindowTitle("Board Colors")
+        layout = QVBoxLayout()
+
+        set_a_color = QPushButton("Set A Color", self)
+        set_a_color.clicked.connect(lambda: self.set_board_color(chess_board, 0))
+        layout.addWidget(set_a_color)
+
+        set_b_color = QPushButton("Set B Color", self)
+        set_b_color.clicked.connect(lambda: self.set_board_color(chess_board, 1))
+        layout.addWidget(set_b_color)
+
+        set_individual_colors = QPushButton("Set Individual Colors", self)
+        set_individual_colors.clicked.connect(lambda: self.set_individual_board_colors(chess_board))
+        layout.addWidget(set_individual_colors)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(color_dialog.accept)
+        layout.addWidget(button_box)
+
+        restore_defaults = QPushButton("Restore Defaults", self)
+        restore_defaults.clicked.connect(lambda: self.restore_default_board_colors(chess_board))
+        layout.addWidget(restore_defaults)
+
+        color_dialog.setLayout(layout)
+        result = color_dialog.exec_()
+
+        if result == QDialog.Accepted:
+            save_changes = lambda: None
+            discard_changes = lambda: (setattr(chess_board, 'default_board_colors', original_board_colors),
+                                       chess_board.clear(),
+                                       chess_board.init_ui())
+
+            if not self.prompt_save_changes(save_changes, discard_changes):
+                return
+
+    def restore_default_board_colors(self, chess_board):
+        """Restore the default board colors."""
+        default_colors = [QColor(240, 217, 181), QColor(181, 136, 99)]
+        chess_board.default_board_colors = default_colors
+        chess_board.clear()
+        chess_board.init_ui()
+
+    def set_board_color(self, chess_board, index):
+        """Update the board color at the given index."""
+        color_dialog = QColorDialog(chess_board.get_board_color(index), self)
+        if color_dialog.exec_():
+            color = color_dialog.currentColor()
+            chess_board.set_board_color(index, color)
+            chess_board.clear()
+            chess_board.init_ui()
+
+    def set_individual_board_colors(self, chess_board):
+        """Open the dialog to set individual board colors."""
+        square_color_dialog = SquareColorDialog(chess_board, self)
+        square_color_dialog.exec_()C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\settings\settingsmanager.py 
+import json
+import os
+
+class SettingsManager:
+    def __init__(self, settings_file='settings.json'):
+        self.settings_file = settings_file
+        self.settings = {}
+
+    def load_settings(self):
+        try:
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r') as settings_file:
+                    self.settings = json.load(settings_file)
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+
+    def save_settings(self):
+        try:
+            with open(self.settings_file, 'w') as settings_file:
+                json.dump(self.settings, settings_file)
+        except Exception as e:
+            print(f"Error saving settings: {e}")
+
+    def get_setting(self, key, default=None):
+        return self.settings.get(key, default)
+
+    def set_setting(self, key, value):
+        self.settings[key] = valueC:\Users\Matt PC\Desktop\ChessProject\ChessProgram\settings\squarecolors.py 
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QPushButton, QDialogButtonBox, QColorDialog, QGridLayout
+from PyQt5.QtGui import QColor, QTransform
+from board.chessboard import ChessBoard
+
+class SquareColorDialog(QDialog):
+    def __init__(self, chess_board, parent=None):
+        super().__init__(parent)
+        self.chess_board = chess_board
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("Set Individual Square Colors")
+
+        layout = QGridLayout()
+
+        for i in range(8):
+            for j in range(8):
+                button = QPushButton()
+                key = 'A' if (i + j) % 2 == 0 else 'B'
+                color = self.chess_board.get_square_color(i, j)
+                button.setStyleSheet(f"background-color: {color.name()}")
+                button.clicked.connect(lambda _, x=i, y=j: self.change_square_color(x, y))
+                layout.addWidget(button, j, i)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok)
+        button_box.accepted.connect(self.accept)
+        layout.addWidget(button_box, 8, 0, 1, 8)
+
+        self.setLayout(layout)
+
+    def change_square_color(self, x, y):
+        key = 'A' if (x + y) % 2 == 0 else 'B'
+        color = self.chess_board.get_square_color(x, y)
+        color_dialog = QColorDialog(color, self)
+        ok = color_dialog.exec_()
+        if ok:
+            color = color_dialog.currentColor()
+            self.chess_board.set_square_color(x, y, color)
+            sender = self.sender()
+            sender.setStyleSheet(f"background-color: {color.name()}")C:\Users\Matt PC\Desktop\ChessProject\ChessProgram\settings\__init__.py 
+# Empty file

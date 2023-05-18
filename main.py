@@ -2,6 +2,7 @@ import sys
 from PyQt5.QtWidgets import QApplication
 from settings.mainwindow import MainWindow
 from board.chessboardview import ChessBoardView
+from board.mouse import MouseHandler
 
 def main():
     app = QApplication(sys.argv)

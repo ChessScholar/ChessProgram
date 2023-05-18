@@ -63,6 +63,7 @@ class ChessBoard(QGraphicsScene):
                 piece_item.setPos(x * 100, y * 100)
                 piece_item.setAcceptedMouseButtons(Qt.NoButton)  # Add this line
                 self.addItem(piece_item)
+                
     def get_piece_image(self, piece):
         piece_name = piece.symbol().lower()
         piece_color = "w" if piece.color == chess.WHITE else "b"
