@@ -9,7 +9,6 @@ import json
 from board.chessboardview import ChessBoardView
 from settings.squarecolors import SquareColorDialog
 from Engine.engine import ChessEngine
-from board.mouse import MouseHandler
 from config import CONFIG
 from Engine.enginemanager import EngineManager
 
@@ -19,17 +18,17 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.analysis_timer = None
         self.engine_manager = EngineManager(self)
-        self.mouse_handler = MouseHandler(self.centralWidget().scene())
 
     def init_ui(self):
         """Initialize the main UI components."""
         self.setWindowTitle("Chess Board GUI")
-        self.setCentralWidget(ChessBoardView())
+        
+        chess_board_view = ChessBoardView(self)  # Pass self (main_window) as an argument
+        self.setCentralWidget(chess_board_view)
+        
         self.create_menus()
         self.load_settings()
-        self.engine = None
-        self.mouse_handler = MouseHandler(self.centralWidget().scene())
-
+        
     def create_menus(self):
         """Create the main menu bar items."""
         menubar = self.menuBar()

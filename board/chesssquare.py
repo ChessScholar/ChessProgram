@@ -12,10 +12,3 @@ class ChessSquare(QGraphicsRectItem):
     def set_color(self, color):
         self.color = color
         self.setBrush(QBrush(color))
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            x, y = int(self.x() // 100), int(self.y() // 100)
-            square = chess.square(x, y)
-            piece = self.scene().board.piece_at(square)
-            self.scene().squareClicked.emit(square, piece, x, y)
